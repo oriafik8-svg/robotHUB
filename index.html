@@ -45,57 +45,84 @@ input:focus{border-color:#2563eb}
 </div>
 <script>
 const $=id=>document.getElementById(id);
+
+// Pybricks official BLE protocol.
 const PYBRICKS_SERVICE='c5f50001-8280-46da-89f4-6d8051e4aeef';
 const PYBRICKS_COMMAND_EVENT='c5f50002-8280-46da-89f4-6d8051e4aeef';
-const PYBRICKS_START_PROGRAM=1;
-const NUS_SERVICE='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_TX='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_RX='6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const PB_START_USER_PROGRAM=1;
+const PB_STOP_USER_PROGRAM=0;
+const PB_WRITE_STDIN=6;
+const PB_EVENT_STATUS_REPORT=0;
+const PB_EVENT_WRITE_STDOUT=1;
+const PB_STATUS_USER_PROGRAM_RUNNING=(1<<6);
+
 const GEMINI_MODEL='gemini-3.8-flash';
 
 let geminiKey='';
 try{geminiKey=localStorage.getItem('rk')||'';$('key').value=geminiKey}catch(e){}
 function saveKey(){geminiKey=$('key').value.trim();try{localStorage.setItem('rk',geminiKey)}catch(e){}}
 
-let bleDevice=null,bleServer=null,nusService=null,nusTx=null,nusRx=null,bleConnecting=false,bleProgramRunning=false;
+let bleDevice=null,bleServer=null,pbChar=null,bleConnecting=false;
+let programRunning=false;
 let stdoutDecoder=new TextDecoder(),incomingBuffer='';
 let pose={x:0,y:0,h:0,m:0},trail=[],obs=[],edges=[],log=[];
-function clearMap(){trail=[];obs=[];edges=[];log=[]}
+
+function clearMap(){trail=[];obs=[];edges=[]}
 function setStatus(s){$('st').textContent=s}
-function addDebug(s){log.push(String(s));if(log.length>12)log.shift();$('debug').textContent=log.join('\n')}
+function addDebug(s){log.push(String(s));if(log.length>16)log.shift();$('debug').textContent=log.join('\n')}
 
-async function writeWithBestMethod(ch,data){
-  if(typeof ch.writeValueWithoutResponse==='function')return ch.writeValueWithoutResponse(data);
-  if(typeof ch.writeValueWithResponse==='function')return ch.writeValueWithResponse(data);
-  return ch.writeValue(data);
+function disconnectCurrent(){
+  try{if(bleDevice?.gatt?.connected)bleDevice.gatt.disconnect()}catch(e){}
+  bleServer=null;pbChar=null;programRunning=false;
 }
 
-async function connectNus(device){
-  setStatus('מתחבר ישירות לערוץ הרובוט...');
-  bleServer=await device.gatt.connect();
-  nusService=await bleServer.getPrimaryService(NUS_SERVICE);
-  nusTx=await nusService.getCharacteristic(NUS_TX);
-  nusRx=await nusService.getCharacteristic(NUS_RX);
-  await nusTx.startNotifications();
-  nusTx.removeEventListener('characteristicvaluechanged',handleNusNotification);
-  nusTx.addEventListener('characteristicvaluechanged',handleNusNotification);
-  setStatus('מחובר · Bluetooth ישיר לרובוט');
-  addDebug('NUS connected');
+async function writePb(payload){
+  if(!pbChar)throw new Error('אין חיבור Pybricks');
+  const data=payload instanceof Uint8Array?payload:new Uint8Array(payload);
+  if(typeof pbChar.writeValueWithResponse==='function'){
+    return pbChar.writeValueWithResponse(data);
+  }
+  if(typeof pbChar.writeValueWithoutResponse==='function'){
+    return pbChar.writeValueWithoutResponse(data);
+  }
+  return pbChar.writeValue(data);
 }
 
-async function startSavedProgram(device){
-  let server=null;
+async function sendStdin(text){
+  const bytes=new TextEncoder().encode(text+'\n');
+  const packet=new Uint8Array(bytes.length+1);
+  packet[0]=PB_WRITE_STDIN;
+  packet.set(bytes,1);
+  await writePb(packet);
+}
+
+async function requestStartProgram(){
+  // The program is already stored on the hub in a Pybricks program slot.
+  await writePb(new Uint8Array([PB_START_USER_PROGRAM]));
+  addDebug('START_USER_PROGRAM sent');
+}
+
+async function startRobotProgram(){
+  if(!pbChar){
+    setStatus('קודם לחץ על חבר רובוט (Bluetooth)');
+    return;
+  }
   try{
     setStatus('מפעיל את התוכנית השמורה ב-Hub...');
-    server=await device.gatt.connect();
-    const service=await server.getPrimaryService(PYBRICKS_SERVICE);
-    const ch=await service.getCharacteristic(PYBRICKS_COMMAND_EVENT);
-    await writeWithBestMethod(ch,new Uint8Array([PYBRICKS_START_PROGRAM]));
-    addDebug('START_USER_PROGRAM sent');
+    try{
+      await requestStartProgram();
+    }catch(e){
+      // BUSY is expected when the program is already running.
+      addDebug('Start command: '+(e.message||e));
+    }
+    for(let i=0;i<20;i++){
+      if(programRunning)break;
+      await new Promise(r=>setTimeout(r,200));
+    }
+    setStatus(programRunning?'מחובר · התוכנית רצה · ממתין ל"סע"':'מחובר · נסה ללחוץ "סע"');
   }catch(e){
-    addDebug('Start skipped/failed: '+(e.message||e));
-  }finally{
-    try{if(device.gatt.connected)device.gatt.disconnect()}catch(e){}
+    setStatus('שגיאה בהפעלת התוכנית: '+(e.message||e));
+    addDebug('Start error: '+(e.message||e));
   }
 }
 
@@ -105,82 +132,99 @@ async function connectBle(){
   try{
     if(!('bluetooth' in navigator))throw new Error('הדפדפן לא תומך ב-Web Bluetooth');
     if(!window.isSecureContext)throw new Error('החיבור דורש HTTPS');
-    setStatus('מחפש את ה-Hub...');
+
+    disconnectCurrent();
+    setStatus('מחפש את Pybricks Hub...');
+
     const dev=await navigator.bluetooth.requestDevice({
-      filters:[{services:[NUS_SERVICE]},{services:[PYBRICKS_SERVICE]}],
-      optionalServices:[NUS_SERVICE,PYBRICKS_SERVICE]
+      filters:[{services:[PYBRICKS_SERVICE]}],
+      optionalServices:[PYBRICKS_SERVICE]
     });
+
     bleDevice=dev;
     dev.addEventListener('gattserverdisconnected',onBleDisconnected);
 
-    // קודם מנסים את הערוץ הישיר של התוכנית.
+    setStatus('מתחבר ל-Pybricks...');
+    bleServer=await dev.gatt.connect();
+    const service=await bleServer.getPrimaryService(PYBRICKS_SERVICE);
+    pbChar=await service.getCharacteristic(PYBRICKS_COMMAND_EVENT);
+
+    pbChar.removeEventListener('characteristicvaluechanged',handlePybricksNotification);
+    await pbChar.startNotifications();
+    pbChar.addEventListener('characteristicvaluechanged',handlePybricksNotification);
+
+    setStatus('מחובר · Pybricks Bluetooth');
+    addDebug('Pybricks GATT connected');
+
+    // Let the browser receive the initial status event before attempting start.
+    await new Promise(r=>setTimeout(r,250));
+
+    // Automatically start the saved user program. If it is already running,
+    // Pybricks will report BUSY; in that case the existing program remains running.
     try{
-      await connectNus(dev);
-      return;
-    }catch(first){
-      addDebug('NUS not running yet');
-      try{if(dev.gatt.connected)dev.gatt.disconnect()}catch(e){}
+      await requestStartProgram();
+    }catch(e){
+      addDebug('Auto-start: '+(e.message||e));
     }
 
-    // אם התוכנית לא רצה, משתמשים בשירות Pybricks רק כדי להפעיל אותה.
-    await startSavedProgram(dev);
-
-    // נותנים ל-BLE של התוכנית לעלות ואז מתחברים מחדש לערוץ NUS.
-    let lastErr=null;
-    for(let i=0;i<12;i++){
-      await new Promise(r=>setTimeout(r,350));
-      try{
-        await connectNus(dev);
-        return;
-      }catch(e){
-        lastErr=e;
-        try{if(dev.gatt.connected)dev.gatt.disconnect()}catch(x){}
-      }
+    for(let i=0;i<25;i++){
+      if(programRunning)break;
+      await new Promise(r=>setTimeout(r,200));
     }
-    throw lastErr||new Error('ה-NUS של הרובוט לא עלה');
+
+    if(programRunning){
+      setStatus('מחובר · התוכנית רצה · לחץ "סע" או שמאל ב-Hub');
+    }else{
+      setStatus('מחובר · התוכנית לא אישרה ריצה עדיין');
+      addDebug('Program-running flag not received yet');
+    }
   }catch(e){
     setStatus('שגיאה: '+(e.message||String(e)));
     addDebug('Bluetooth error: '+(e.message||e));
   }finally{bleConnecting=false}
 }
 
-async function startRobotProgram(){
-  if(!bleDevice){setStatus('קודם לחץ על חבר רובוט (Bluetooth)');return}
-  try{
-    await startSavedProgram(bleDevice);
-    for(let i=0;i<12;i++){
-      await new Promise(r=>setTimeout(r,350));
-      try{await connectNus(bleDevice);return}catch(e){}
-    }
-    setStatus('התוכנית הופעלה, אבל ערוץ הבקרה עדיין לא זמין');
-  }catch(e){setStatus('שגיאה בהפעלת התוכנית: '+(e.message||e))}
-}
-
 function onBleDisconnected(){
-  bleServer=null;nusService=null;nusTx=null;nusRx=null;bleProgramRunning=false;
+  bleServer=null;pbChar=null;programRunning=false;
   setStatus('נותק');
   addDebug('BLE disconnected');
 }
 
 async function send(c){
-  if(!nusRx){setStatus('לא מחובר');return}
+  if(!pbChar){setStatus('לא מחובר');return}
   try{
-    const bytes=new TextEncoder().encode(c+'\n');
-    await writeWithBestMethod(nusRx,bytes);
+    // This goes through Pybricks protocol command 6 -> user program stdin.
+    await sendStdin(c);
     setStatus('נשלח: '+c);
-  }catch(e){setStatus('שגיאת שליחה: '+(e.message||String(e)));}
+  }catch(e){
+    setStatus('שגיאת שליחה: '+(e.message||String(e)));
+    addDebug('stdin error: '+(e.message||e));
+  }
 }
 
-function handleNusNotification(event){
-  const v=event.target.value;if(!v||v.byteLength===0)return;
-  const data=new Uint8Array(v.buffer,v.byteOffset,v.byteLength);
-  const text=stdoutDecoder.decode(data,{stream:true});
-  incomingBuffer+=text;
-  let idx;
-  while((idx=incomingBuffer.indexOf('\n'))>=0){
-    const raw=incomingBuffer.slice(0,idx).trim();
-    incomingBuffer=incomingBuffer.slice(idx+1);
-    if(raw)line(raw);
+function handlePybricksNotification(event){
+  const value=event.target.value;
+  if(!value||value.byteLength===0)return;
+  const bytes=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
+  const eventType=bytes[0];
+
+  if(eventType===PB_EVENT_WRITE_STDOUT){
+    const text=stdoutDecoder.decode(bytes.subarray(1),{stream:true});
+    incomingBuffer+=text;
+    let idx;
+    while((idx=incomingBuffer.indexOf('\n'))>=0){
+      const raw=incomingBuffer.slice(0,idx).trim();
+      incomingBuffer=incomingBuffer.slice(idx+1);
+      if(raw)line(raw);
+    }
+    return;
+  }
+
+  if(eventType===PB_EVENT_STATUS_REPORT && bytes.length>=5){
+    const view=new DataView(bytes.buffer,bytes.byteOffset+1,4);
+    const flags=view.getUint32(0,true);
+    programRunning=!!(flags & PB_STATUS_USER_PROGRAM_RUNNING);
+    addDebug('STATUS running='+programRunning+' flags=0x'+flags.toString(16));
   }
 }
 
@@ -188,12 +232,16 @@ function near(a,x,y){return a.some(p=>(p[0]-x)**2+(p[1]-y)**2<60*60)}
 function line(s){
   const p=s.split(',');
   if(p[0]==='P'&&p.length>=5){
-    pose={x:+p[1],y:+p[2],h:+p[3],m:+p[4]};trail.push([pose.x,pose.y]);if(trail.length>3000)trail.shift();return;
+    pose={x:+p[1],y:+p[2],h:+p[3],m:+p[4]};
+    trail.push([pose.x,pose.y]);
+    if(trail.length>3000)trail.shift();
+    return;
   }
   if(p[0]==='O'&&p.length>=3&&!near(obs,+p[1],+p[2])){obs.push([+p[1],+p[2]]);return}
   if(p[0]==='E'&&p.length>=3&&!near(edges,+p[1],+p[2])){edges.push([+p[1],+p[2]]);return}
   if(s==='ROBOT51515_BOOT_OK'){addDebug(s);return}
-  log.push(s);if(log.length>12)log.shift();
+  if(s==='ROBOT51515_READY'){addDebug(s);return}
+  log.push(s);if(log.length>16)log.shift();$('debug').textContent=log.join('\n');
 }
 
 const cv=$('c'),g=cv.getContext('2d');
@@ -222,7 +270,7 @@ function add(cls,t){const d=document.createElement('div');d.className=cls;d.text
 async function ask(){
   const q=$('msg').value.trim();if(!q)return;$('msg').value='';add('u',q);
   const key=$('key').value.trim();if(!key){add('s','הכנס Gemini API key');return}saveKey();
-  const state=`מיקום (${pose.x|0}, ${pose.y|0}) מ"מ, כיוון ${pose.h|0}°, מצב ${pose.m===1?'הביתה':'חקירה'}, מכשולים ${obs.length}, קצוות ${edges.length}, Bluetooth ${nusRx?'פעיל':'לא פעיל'}`;
+  const state=`מיקום (${pose.x|0}, ${pose.y|0}) מ"מ, כיוון ${pose.h|0}°, מצב ${pose.m===1?'הביתה':'חקירה'}, מכשולים ${obs.length}, קצוות ${edges.length}, Bluetooth ${pbChar?'פעיל':'לא פעיל'}`;
   const systemText=`אתה עוזר לרובוט LEGO. אתה אופציונלי בלבד: כפתורי השליטה הישירים באתר עובדים גם בלי AI. ענה בעברית קצרה וברורה והחזר JSON בלבד. המבנה: {"say":"...","cmds":[]}. פקודות מותרות בלבד: GO, STOP, HOME, EXPLORE. אפשר כמה פקודות. מצב: ${state}`;
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   try{
