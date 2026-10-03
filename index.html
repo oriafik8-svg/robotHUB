@@ -7,14 +7,18 @@
 <title>שליטה ברובוט</title>
 
 <style>
+*{
+  box-sizing:border-box;
+}
+
 body{
   margin:0;
-  font-family:system-ui,Arial;
+  font-family:system-ui,Arial,sans-serif;
   background:#111827;
   color:#e5e7eb;
   display:flex;
   height:100vh;
-  overflow:hidden
+  overflow:hidden;
 }
 
 #l{
@@ -22,7 +26,7 @@ body{
   display:flex;
   flex-direction:column;
   padding:10px;
-  min-width:0
+  min-width:0;
 }
 
 #r{
@@ -31,7 +35,7 @@ body{
   padding:10px;
   display:flex;
   flex-direction:column;
-  gap:8px
+  gap:8px;
 }
 
 canvas{
@@ -39,7 +43,7 @@ canvas{
   background:#0b1220;
   border-radius:8px;
   width:100%;
-  min-height:0
+  min-height:0;
 }
 
 button{
@@ -49,19 +53,23 @@ button{
   border-radius:6px;
   padding:8px 12px;
   cursor:pointer;
-  font-size:14px
+  font-size:14px;
 }
 
 button:hover{
-  filter:brightness(1.08)
+  filter:brightness(1.08);
 }
 
 button.g{
-  background:#374151
+  background:#374151;
 }
 
 button.red{
-  background:#dc2626
+  background:#dc2626;
+}
+
+button.green{
+  background:#16a34a;
 }
 
 input{
@@ -70,11 +78,11 @@ input{
   border:1px solid #374151;
   border-radius:6px;
   padding:8px;
-  outline:none
+  outline:none;
 }
 
 input:focus{
-  border-color:#2563eb
+  border-color:#2563eb;
 }
 
 #bar{
@@ -82,7 +90,7 @@ input:focus{
   gap:6px;
   flex-wrap:wrap;
   margin-bottom:8px;
-  align-items:center
+  align-items:center;
 }
 
 #chat{
@@ -91,22 +99,23 @@ input:focus{
   background:#0b1220;
   border-radius:6px;
   padding:8px;
-  font-size:14px
+  font-size:14px;
 }
 
 .u{
   color:#93c5fd;
-  margin:4px 0
+  margin:4px 0;
 }
 
 .a{
   color:#86efac;
-  margin:4px 0
+  margin:4px 0;
 }
 
 .s{
   color:#9ca3af;
-  font-size:12px
+  font-size:12px;
+  margin:4px 0;
 }
 </style>
 
@@ -115,45 +124,99 @@ input:focus{
 <body>
 
 <div id="l">
+
   <div id="bar">
-    <button onclick="connectBle()">חבר רובוט (Bluetooth)</button>
-    <button class="g" onclick="connect()">USB</button>
 
 ```
-<button onclick="send('GO')">▶ סע</button>
-<button class="red" onclick="send('STOP')">■ עצור</button>
-<button class="g" onclick="send('HOME')">🏠 הביתה</button>
-<button class="g" onclick="send('EXPLORE')">🧭 חקור</button>
-<button class="g" onclick="clearMap()">נקה מפה</button>
+<button
+  class="green"
+  onclick="connectBle()"
+>
+  חבר רובוט (Bluetooth)
+</button>
 
-<span id="st" class="s">לא מחובר</span>
+<button
+  onclick="startRobotProgram()"
+>
+  ▶ הפעל תוכנית
+</button>
+
+<button
+  onclick="send('GO')"
+>
+  ▶ סע
+</button>
+
+<button
+  class="red"
+  onclick="send('STOP')"
+>
+  ■ עצור
+</button>
+
+<button
+  class="g"
+  onclick="send('HOME')"
+>
+  🏠 הביתה
+</button>
+
+<button
+  class="g"
+  onclick="send('EXPLORE')"
+>
+  🧭 חקור
+</button>
+
+<button
+  class="g"
+  onclick="clearMap()"
+>
+  נקה מפה
+</button>
+
+<span
+  id="st"
+  class="s"
+>
+  לא מחובר
+</span>
 ```
 
   </div>
 
 <canvas id="c"></canvas>
 
-  <div id="info" class="s" style="margin-top:6px"></div>
+  <div
+    id="info"
+    class="s"
+    style="margin-top:6px"
+  ></div>
+
 </div>
 
 <div id="r">
-  <input
-    id="key"
-    type="password"
-    placeholder="Gemini API key"
-    onchange="saveKey()"
-  >
+
+<input
+id="key"
+type="password"
+placeholder="Gemini API key"
+onchange="saveKey()"
+
+>
 
   <div id="chat"></div>
 
 <input
 id="msg"
 placeholder="למשל: תעצור ותחזור הביתה"
-onkeydown="if(event.key==='Enter')ask()"
+onkeydown="if(event.key==='Enter') ask()"
 
 >
 
-<button onclick="ask()">שלח ל-Gemini</button>
+  <button onclick="ask()">
+    שלח ל-Gemini
+  </button>
 
 </div>
 
@@ -163,41 +226,70 @@ onkeydown="if(event.key==='Enter')ask()"
    כללי
    ========================================================= */
 
-const $ = id => document.getElementById(id);
+const $ = id =>
+  document.getElementById(id);
+
 
 /* =========================================================
    Gemini
    ========================================================= */
 
-/*
-  Gemini REST API.
-  אפשר להחליף כאן מודל בעתיד בלי לשנות שום דבר אחר.
-*/
-const GEMINI_MODEL = 'gemini-3.8-flash';
+const GEMINI_MODEL =
+  'gemini-3.8-flash';
 
 let geminiKey = '';
 
 try{
-  geminiKey = localStorage.getItem('rk') || '';
-  $('key').value = geminiKey;
+
+  geminiKey =
+    localStorage.getItem('rk') || '';
+
+  $('key').value =
+    geminiKey;
+
 }catch(e){
+
   geminiKey = '';
+
 }
 
+
 function saveKey(){
+
   try{
-    geminiKey = $('key').value.trim();
-    localStorage.setItem('rk', geminiKey);
+
+    geminiKey =
+      $('key').value.trim();
+
+    localStorage.setItem(
+      'rk',
+      geminiKey
+    );
+
   }catch(e){
-    geminiKey = $('key').value.trim();
+
+    geminiKey =
+      $('key').value.trim();
+
   }
+
 }
+
 
 /* =========================================================
    מצב הרובוט
    ========================================================= */
 
 let writer = null;
+
+let bleDevice = null;
+
+let bleCharacteristic = null;
+
+let bleConnecting = false;
+
+let bleProgramRunning = false;
+
 
 let pose = {
   x:0,
@@ -206,175 +298,140 @@ let pose = {
   m:0
 };
 
+
 let trail = [];
+
 let obs = [];
+
 let edges = [];
+
 let log = [];
+
 
 /* =========================================================
    מפה
    ========================================================= */
 
 function clearMap(){
+
   trail = [];
+
   obs = [];
+
   edges = [];
+
   log = [];
+
 }
 
-/* =========================================================
-   USB
-   ========================================================= */
-
-async function connect(){
-
-  try{
-
-    if(!('serial' in navigator)){
-      throw new Error('הדפדפן לא תומך ב-Web Serial');
-    }
-
-    const port = await navigator.serial.requestPort();
-
-    await port.open({
-      baudRate:115200
-    });
-
-    const enc = new TextEncoderStream();
-
-    enc.readable.pipeTo(port.writable);
-
-    writer = enc.writable.getWriter();
-
-    const dec = new TextDecoderStream();
-
-    port.readable.pipeTo(dec.writable);
-
-    const rd = dec.readable.getReader();
-
-    let buf = '';
-
-    $('st').textContent = 'מחובר (USB)';
-
-    while(true){
-
-      const {value,done} = await rd.read();
-
-      if(done) break;
-
-      buf += value;
-
-      let i;
-
-      while((i = buf.indexOf('\n')) >= 0){
-
-        const raw = buf.slice(0,i).trim();
-
-        buf = buf.slice(i+1);
-
-        line(raw);
-      }
-    }
-
-  }catch(e){
-
-    $('st').textContent = 'שגיאה: ' + e.message;
-
-  }
-
-  $('st').textContent = 'לא מחובר';
-
-  writer = null;
-}
 
 /* =========================================================
-   Bluetooth - Pybricks
+   Pybricks BLE
    ========================================================= */
 
 /*
-  Pybricks Hub שלך מפרסם את Nordic UART Service:
-  6e400001-b5a3-f393-e0a9-e50e24dcca9e
+  Pybricks GATT service:
+  c5f50001-8280-46da-89f4-6d8051e4aeef
 
-  אנחנו מחפשים לפי השירות ולא לפי שם.
-  זה יותר אמין כי בפועל ה-Hub מזוהה אצלך כ-"Pybricks Hub".
+  Command/Event characteristic:
+  c5f50002-8280-46da-89f4-6d8051e4aeef
+
+  Hub capabilities:
+  c5f50003-8280-46da-89f4-6d8051e4aeef
+
+  Pybricks commands:
+  0 = STOP_USER_PROGRAM
+  1 = START_USER_PROGRAM
+  6 = WRITE_STDIN
+
+  Pybricks events:
+  0 = STATUS_REPORT
+  1 = WRITE_STDOUT
 */
 
-const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 
-const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_RX = '6e400002-b5a3-f393-e0a9-e50e';
+const PYBRICKS_SERVICE =
+  'c5f50001-8280-46da-89f4-6d8051e4aeef';
+
+
+const PYBRICKS_COMMAND_EVENT =
+  'c5f50002-8280-46da-89f4-6d8051e4aeef';
+
+
+const PYBRICKS_STOP_PROGRAM = 0;
+
+const PYBRICKS_START_PROGRAM = 1;
+
+const PYBRICKS_WRITE_STDIN = 6;
+
+const PYBRICKS_STATUS_REPORT = 0;
+
+const PYBRICKS_WRITE_STDOUT = 1;
+
+const PYBRICKS_RUNNING_FLAG = 64;
+
+
+let stdoutDecoder =
+  new TextDecoder();
+
+
+let incomingBuffer = '';
+
+
+/* =========================================================
+   התחברות ל-Hub
+   ========================================================= */
 
 async function connectBle(){
+
+  if(bleConnecting){
+    return;
+  }
 
   try{
 
     if(!('bluetooth' in navigator)){
-      throw new Error('הדפדפן לא תומך ב-Web Bluetooth');
+
+      throw new Error(
+        'הדפדפן לא תומך ב-Web Bluetooth'
+      );
+
     }
 
-    const dev = await navigator.bluetooth.requestDevice({
-      filters:[
-        {
-          services:[NUS]
-        }
-      ]
-    });
 
-    $('st').textContent = 'מתחבר ל-' + (dev.name || 'Hub') + '...';
+    if(!window.isSecureContext){
 
-    const server = await dev.gatt.connect();
+      throw new Error(
+        'החיבור דורש HTTPS'
+      );
 
-    const svc = await server.getPrimaryService(NUS);
+    }
 
-    const tx = await svc.getCharacteristic(NUS_TX);
-    const rx = await svc.getCharacteristic(NUS_RX);
 
-    let buf = '';
+    bleConnecting = true;
 
-    const dec = new TextDecoder();
 
-    tx.addEventListener(
-      'characteristicvaluechanged',
-      e => {
+    $('st').textContent =
+      'מחפש Pybricks Hub...';
 
-        buf += dec.decode(
-          e.target.value,
-          {stream:true}
-        );
 
-        let i;
+    const dev =
+      await navigator.bluetooth.requestDevice({
 
-        while((i = buf.indexOf('\n')) >= 0){
+        filters:[
+          {
+            services:[
+              PYBRICKS_SERVICE
+            ]
+          }
+        ]
 
-          const raw = buf.slice(0,i).trim();
+      });
 
-          buf = buf.slice(i+1);
 
-          line(raw);
-        }
-      }
-    );
+    bleDevice =
+      dev;
 
-    await tx.startNotifications();
-
-    writer = {
-      write: async text => {
-
-        const bytes = new TextEncoder().encode(text);
-
-        /*
-          20 bytes בכל כתיבה כדי להיות בטוחים
-          מול MTU קטן של BLE.
-        */
-
-        for(let i=0; i<bytes.length; i+=20){
-
-          const chunk = bytes.slice(i,i+20);
-
-          await rx.writeValueWithoutResponse(chunk);
-        }
-      }
-    };
 
     dev.addEventListener(
       'gattserverdisconnected',
@@ -382,51 +439,456 @@ async function connectBle(){
 
         writer = null;
 
-        $('st').textContent = 'נותק';
+        bleCharacteristic = null;
+
+        bleProgramRunning = false;
+
+        $('st').textContent =
+          'נותק';
+
       }
     );
 
-    $('st').textContent = 'מחובר (Bluetooth)';
+
+    $('st').textContent =
+      'מתחבר ל-' +
+      (dev.name || 'Pybricks Hub') +
+      '...';
+
+
+    const server =
+      await dev.gatt.connect();
+
+
+    const service =
+      await server.getPrimaryService(
+        PYBRICKS_SERVICE
+      );
+
+
+    bleCharacteristic =
+      await service.getCharacteristic(
+        PYBRICKS_COMMAND_EVENT
+      );
+
+
+    await bleCharacteristic.startNotifications();
+
+
+    bleCharacteristic.addEventListener(
+      'characteristicvaluechanged',
+      handlePybricksNotification
+    );
+
+
+    writer = {
+
+      write: async text => {
+
+        await sendStdin(text);
+
+      }
+
+    };
+
+
+    $('st').textContent =
+      'מחובר (Pybricks Bluetooth)';
+
+
+    /*
+      מנסים להפעיל את התוכנית השמורה ב-Hub.
+
+      אם היא כבר רצה, Pybricks יחזיר BUSY.
+      זה בסדר — החיבור עצמו עדיין תקין.
+    */
+
+    try{
+
+      await startRobotProgram();
+
+    }catch(e){
+
+      console.log(
+        'Start program:',
+        e
+      );
+
+    }
+
 
   }catch(e){
 
-    $('st').textContent = 'שגיאה: ' + e.message;
+    writer = null;
+
+    bleCharacteristic = null;
+
+
+    $('st').textContent =
+      'שגיאה: ' +
+      (e.message || String(e));
+
+
+  }finally{
+
+    bleConnecting = false;
+
   }
+
 }
+
+
+/* =========================================================
+   הפעלת התוכנית השמורה ב-Hub
+   ========================================================= */
+
+async function startRobotProgram(){
+
+  if(!bleCharacteristic){
+
+    $('st').textContent =
+      'לא מחובר';
+
+    return;
+
+  }
+
+
+  const packet =
+    new Uint8Array([
+      PYBRICKS_START_PROGRAM
+    ]);
+
+
+  try{
+
+    if(
+      typeof bleCharacteristic.writeValueWithResponse ===
+      'function'
+    ){
+
+      await bleCharacteristic.writeValueWithResponse(
+        packet
+      );
+
+    }else{
+
+      await bleCharacteristic.writeValue(
+        packet
+      );
+
+    }
+
+
+    $('st').textContent =
+      'מחובר · התוכנית הופעלה';
+
+
+  }catch(e){
+
+    /*
+      אם התוכנית כבר רצה, Pybricks עשוי להחזיר BUSY.
+      במקרה כזה אנחנו לא מנתקים את החיבור.
+    */
+
+    $('st').textContent =
+      'מחובר (התוכנית כבר רצה או דורשת התחלה)';
+
+  }
+
+}
+
+
+/* =========================================================
+   שליחת stdin ל-Pybricks
+   ========================================================= */
+
+async function sendStdin(text){
+
+  if(!bleCharacteristic){
+
+    throw new Error(
+      'אין חיבור פעיל ל-Pybricks Hub'
+    );
+
+  }
+
+
+  const bytes =
+    new TextEncoder().encode(text);
+
+
+  /*
+    כל כתיבה היא:
+    [0x06] + payload
+
+    19 bytes payload + 1 byte command
+    = 20 bytes לכל כתיבה.
+  */
+
+  const chunkSize = 19;
+
+
+  for(
+    let i = 0;
+    i < bytes.length;
+    i += chunkSize
+  ){
+
+    const chunk =
+      bytes.slice(
+        i,
+        i + chunkSize
+      );
+
+
+    const packet =
+      new Uint8Array(
+        1 + chunk.length
+      );
+
+
+    packet[0] =
+      PYBRICKS_WRITE_STDIN;
+
+
+    packet.set(
+      chunk,
+      1
+    );
+
+
+    if(
+      typeof bleCharacteristic.writeValueWithResponse ===
+      'function'
+    ){
+
+      await bleCharacteristic.writeValueWithResponse(
+        packet
+      );
+
+    }else{
+
+      await bleCharacteristic.writeValue(
+        packet
+      );
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   קבלת אירועים מה-Hub
+   ========================================================= */
+
+function handlePybricksNotification(event){
+
+  const value =
+    event.target.value;
+
+
+  if(
+    !value ||
+    value.byteLength < 1
+  ){
+
+    return;
+
+  }
+
+
+  const data =
+    new Uint8Array(
+      value.buffer,
+      value.byteOffset,
+      value.byteLength
+    );
+
+
+  const eventType =
+    data[0];
+
+
+  /*
+    Event 1 = stdout
+  */
+
+  if(
+    eventType ===
+    PYBRICKS_WRITE_STDOUT
+  ){
+
+    const payload =
+      data.slice(1);
+
+
+    const text =
+      stdoutDecoder.decode(
+        payload,
+        {
+          stream:true
+        }
+      );
+
+
+    if(text){
+
+      processIncomingText(
+        text
+      );
+
+    }
+
+
+    return;
+
+  }
+
+
+  /*
+    Event 0 = status report
+
+    32-bit little-endian flags.
+  */
+
+  if(
+    eventType ===
+    PYBRICKS_STATUS_REPORT &&
+    data.length >= 5
+  ){
+
+    const flags =
+      data[1] |
+      (data[2] << 8) |
+      (data[3] << 16) |
+      (data[4] << 24);
+
+
+    bleProgramRunning =
+      (flags &
+       PYBRICKS_RUNNING_FLAG) !== 0;
+
+  }
+
+}
+
+
+/* =========================================================
+   פענוח stdout
+   ========================================================= */
+
+function processIncomingText(text){
+
+  incomingBuffer += text;
+
+
+  let index;
+
+
+  while(
+    (index =
+      incomingBuffer.indexOf('\n')) >= 0
+  ){
+
+    const raw =
+      incomingBuffer
+        .slice(
+          0,
+          index
+        )
+        .trim();
+
+
+    incomingBuffer =
+      incomingBuffer.slice(
+        index + 1
+      );
+
+
+    if(raw){
+
+      line(raw);
+
+    }
+
+  }
+
+}
+
 
 /* =========================================================
    שליחת פקודות לרובוט
    ========================================================= */
 
-function send(c){
+async function send(c){
 
-  if(writer){
+  if(!writer){
 
-    writer.write(c + '\n');
+    $('st').textContent =
+      'לא מחובר';
 
-  }else{
+    return;
 
-    $('st').textContent = 'לא מחובר';
   }
+
+
+  try{
+
+    await writer.write(
+      c + '\n'
+    );
+
+
+    $('st').textContent =
+      'נשלח: ' + c;
+
+
+  }catch(e){
+
+    $('st').textContent =
+      'שגיאת שליחה: ' +
+      (e.message || String(e));
+
+  }
+
 }
+
 
 /* =========================================================
    קריאת נתונים מהרובוט
    ========================================================= */
 
-function near(a,x,y){
+function near(
+  a,
+  x,
+  y
+){
 
   return a.some(
+
     p =>
-      (p[0]-x)**2 +
-      (p[1]-y)**2 <
-      60*60
+
+      (p[0] - x) ** 2 +
+      (p[1] - y) ** 2 <
+      60 * 60
+
   );
+
 }
+
 
 function line(s){
 
-  const p = s.split(',');
+  const p =
+    s.split(',');
+
+
+  /*
+    P,x,y,heading,mode
+  */
 
   if(
     p[0] === 'P' &&
@@ -434,172 +896,340 @@ function line(s){
   ){
 
     pose = {
+
       x:+p[1],
+
       y:+p[2],
+
       h:+p[3],
+
       m:+p[4]
+
     };
 
+
     trail.push([
+
       pose.x,
+
       pose.y
+
     ]);
 
-    if(trail.length > 3000){
+
+    if(
+      trail.length > 3000
+    ){
+
       trail.shift();
+
     }
+
+
+    return;
 
   }
 
-  else if(
+
+  /*
+    O,x,y
+  */
+
+  if(
     p[0] === 'O' &&
     p.length >= 3 &&
-    !near(obs,+p[1],+p[2])
+    !near(
+      obs,
+      +p[1],
+      +p[2]
+    )
   ){
 
     obs.push([
+
       +p[1],
+
       +p[2]
+
     ]);
+
+
+    return;
 
   }
 
-  else if(
+
+  /*
+    E,x,y
+  */
+
+  if(
     p[0] === 'E' &&
     p.length >= 3 &&
-    !near(edges,+p[1],+p[2])
+    !near(
+      edges,
+      +p[1],
+      +p[2]
+    )
   ){
 
     edges.push([
+
       +p[1],
+
       +p[2]
+
     ]);
 
+
+    return;
+
   }
 
-  else if(s){
 
-    log.push(s);
+  /*
+    הודעה רגילה מה-Hub
+  */
 
-    if(log.length > 5){
-      log.shift();
-    }
+  log.push(s);
+
+
+  if(
+    log.length > 5
+  ){
+
+    log.shift();
+
   }
+
 }
+
 
 /* =========================================================
    ציור המפה
    ========================================================= */
 
-const cv = $('c');
-const g = cv.getContext('2d');
+const cv =
+  $('c');
+
+
+const g =
+  cv.getContext('2d');
+
 
 function draw(){
 
-  cv.width = cv.clientWidth;
-  cv.height = cv.clientHeight;
+  cv.width =
+    cv.clientWidth;
+
+
+  cv.height =
+    cv.clientHeight;
+
 
   const all = [
+
     ...trail,
+
     ...obs,
+
     ...edges,
-    [pose.x,pose.y],
+
+    [pose.x, pose.y],
+
     [0,0]
+
   ];
 
-  const xs = all.map(a => a[0]);
-  const ys = all.map(a => a[1]);
 
-  let x0 = Math.min(...xs) - 150;
-  let x1 = Math.max(...xs) + 150;
-
-  let y0 = Math.min(...ys) - 150;
-  let y1 = Math.max(...ys) + 150;
-
-  const sc = Math.min(
-    cv.width / Math.max(1,x1-x0),
-    cv.height / Math.max(1,y1-y0)
-  );
-
-  const X = x =>
-    (x-x0)*sc +
-    (cv.width-(x1-x0)*sc)/2;
-
-  const Y = y =>
-    cv.height -
-    (
-      (y-y0)*sc +
-      (cv.height-(y1-y0)*sc)/2
+  const xs =
+    all.map(
+      a => a[0]
     );
+
+
+  const ys =
+    all.map(
+      a => a[1]
+    );
+
+
+  let x0 =
+    Math.min(...xs) - 150;
+
+
+  let x1 =
+    Math.max(...xs) + 150;
+
+
+  let y0 =
+    Math.min(...ys) - 150;
+
+
+  let y1 =
+    Math.max(...ys) + 150;
+
+
+  const sc =
+    Math.min(
+
+      cv.width /
+      Math.max(
+        1,
+        x1 - x0
+      ),
+
+      cv.height /
+      Math.max(
+        1,
+        y1 - y0
+      )
+
+    );
+
+
+  const X =
+    x =>
+
+      (x - x0) * sc +
+
+      (
+        cv.width -
+        (x1 - x0) * sc
+      ) / 2;
+
+
+  const Y =
+    y =>
+
+      cv.height -
+
+      (
+        (y - y0) * sc +
+
+        (
+          cv.height -
+          (y1 - y0) * sc
+        ) / 2
+      );
+
 
   /* מסלול */
 
-  g.strokeStyle = '#38bdf8';
+  g.strokeStyle =
+    '#38bdf8';
+
 
   g.beginPath();
 
-  trail.forEach((t,i) => {
 
-    if(i){
-      g.lineTo(
-        X(t[0]),
-        Y(t[1])
-      );
-    }else{
-      g.moveTo(
-        X(t[0]),
-        Y(t[1])
-      );
+  trail.forEach(
+    (t,i) => {
+
+      if(i){
+
+        g.lineTo(
+          X(t[0]),
+          Y(t[1])
+        );
+
+      }else{
+
+        g.moveTo(
+          X(t[0]),
+          Y(t[1])
+        );
+
+      }
+
     }
+  );
 
-  });
 
   g.stroke();
 
+
   /* מכשולים */
 
-  g.fillStyle = '#facc15';
+  g.fillStyle =
+    '#facc15';
 
-  obs.forEach(o => {
 
-    g.beginPath();
+  obs.forEach(
+    o => {
 
-    g.arc(
-      X(o[0]),
-      Y(o[1]),
-      Math.max(4,50*sc),
-      0,
-      7
-    );
+      g.beginPath();
 
-    g.fill();
-  });
+
+      g.arc(
+
+        X(o[0]),
+
+        Y(o[1]),
+
+        Math.max(
+          4,
+          50 * sc
+        ),
+
+        0,
+
+        7
+
+      );
+
+
+      g.fill();
+
+    }
+  );
+
 
   /* קצוות */
 
-  g.fillStyle = '#ef4444';
+  g.fillStyle =
+    '#ef4444';
 
-  edges.forEach(o => {
 
-    g.fillRect(
-      X(o[0])-6,
-      Y(o[1])-6,
-      12,
-      12
-    );
-  });
+  edges.forEach(
+    o => {
+
+      g.fillRect(
+
+        X(o[0]) - 6,
+
+        Y(o[1]) - 6,
+
+        12,
+
+        12
+
+      );
+
+    }
+  );
+
 
   /* בית */
 
-  g.fillStyle = '#22c55e';
+  g.fillStyle =
+    '#22c55e';
 
-  g.font = '16px Arial';
+
+  g.font =
+    '16px Arial';
+
 
   g.fillText(
+
     '🏠',
-    X(0)-8,
-    Y(0)+6
+
+    X(0) - 8,
+
+    Y(0) + 6
+
   );
+
 
   /* הרובוט */
 
@@ -608,55 +1238,115 @@ function draw(){
     Math.PI /
     180;
 
+
   g.save();
 
+
   g.translate(
+
     X(pose.x),
+
     Y(pose.y)
+
   );
 
-  g.rotate(-a);
 
-  g.fillStyle = '#fff';
+  g.rotate(
+    -a
+  );
+
+
+  g.fillStyle =
+    '#fff';
+
 
   g.beginPath();
 
-  g.moveTo(14,0);
-  g.lineTo(-10,-8);
-  g.lineTo(-10,8);
+
+  g.moveTo(
+    14,
+    0
+  );
+
+
+  g.lineTo(
+    -10,
+    -8
+  );
+
+
+  g.lineTo(
+    -10,
+    8
+  );
+
+
   g.fill();
+
 
   g.restore();
 
+
   $('info').textContent =
-    `מיקום (${pose.x|0}, ${pose.y|0}) מ"מ · ` +
-    `כיוון ${pose.h|0}° · ` +
-    `מצב ${pose.m===1 ? 'הביתה' : 'חקירה'} · ` +
+
+    `מיקום (${pose.x | 0}, ${pose.y | 0}) מ"מ · ` +
+
+    `כיוון ${pose.h | 0}° · ` +
+
+    `מצב ${pose.m === 1 ? 'הביתה' : 'חקירה'} · ` +
+
     `מכשולים ${obs.length} · ` +
-    `קצוות ${edges.length} ` +
+
+    `קצוות ${edges.length} · ` +
+
+    `תוכנית ${bleProgramRunning ? 'רצה' : 'לא מזוהה כרצה'} ` +
+
     `${log.join(' | ')}`;
 
-  requestAnimationFrame(draw);
+
+  requestAnimationFrame(
+    draw
+  );
+
 }
 
+
 draw();
+
 
 /* =========================================================
    צ'אט
    ========================================================= */
 
-function add(cls,t){
+function add(
+  cls,
+  t
+){
 
-  const d = document.createElement('div');
+  const d =
+    document.createElement(
+      'div'
+    );
 
-  d.className = cls;
 
-  d.textContent = t;
+  d.className =
+    cls;
 
-  $('chat').appendChild(d);
 
-  $('chat').scrollTop = 1e9;
+  d.textContent =
+    t;
+
+
+  $('chat').appendChild(
+    d
+  );
+
+
+  $('chat').scrollTop =
+    $('chat').scrollHeight;
+
 }
+
 
 /* =========================================================
    Gemini
@@ -664,17 +1354,30 @@ function add(cls,t){
 
 async function ask(){
 
-  const q = $('msg').value.trim();
+  const q =
+    $('msg').value.trim();
+
 
   if(!q){
+
     return;
+
   }
 
-  $('msg').value = '';
 
-  add('u',q);
+  $('msg').value =
+    '';
 
-  const key = $('key').value.trim();
+
+  add(
+    'u',
+    q
+  );
+
+
+  const key =
+    $('key').value.trim();
+
 
   if(!key){
 
@@ -684,18 +1387,30 @@ async function ask(){
     );
 
     return;
+
   }
+
 
   saveKey();
 
+
   const state =
-    `מיקום (${pose.x|0}, ${pose.y|0}) מ"מ, ` +
-    `כיוון ${pose.h|0}°, ` +
-    `מצב ${pose.m===1 ? 'הביתה' : 'חקירה'}, ` +
+
+    `מיקום (${pose.x | 0}, ${pose.y | 0}) מ"מ, ` +
+
+    `כיוון ${pose.h | 0}°, ` +
+
+    `מצב ${pose.m === 1 ? 'הביתה' : 'חקירה'}, ` +
+
     `מכשולים שנמצאו ${obs.length}, ` +
-    `קצוות ${edges.length}`;
+
+    `קצוות ${edges.length}, ` +
+
+    `חיבור Bluetooth ${writer ? 'פעיל' : 'לא פעיל'}`;
+
 
   const systemText = `
+
 אתה המוח של רובוט LEGO המחובר למשתמש.
 
 ענה בעברית קצרה וברורה.
@@ -703,12 +1418,14 @@ async function ask(){
 אתה חייב להחזיר JSON בלבד.
 
 המבנה חייב להיות:
+
 {
   "say": "תשובה קצרה למשתמש",
   "cmds": []
 }
 
 פקודות מותרות בלבד:
+
 GO
 STOP
 HOME
@@ -722,168 +1439,288 @@ EXPLORE = לעבור למצב חקירה.
 אפשר להחזיר כמה פקודות ברצף.
 
 אם אין צורך לבצע פעולה ברובוט:
+
 "cmds": []
 
 אל תמציא פקודות אחרות.
 
 מצב הרובוט:
+
 ${state}
+
 `.trim();
 
+
   const url =
+
     `https://generativelanguage.googleapis.com/v1beta/models/` +
+
     `${GEMINI_MODEL}:generateContent`;
+
 
   try{
 
-    const response = await fetch(
-      url,
-      {
-        method:'POST',
+    const response =
+      await fetch(
 
-        headers:{
-          'Content-Type':'application/json',
-          'x-goog-api-key':key
-        },
+        url,
 
-        body:JSON.stringify({
+        {
 
-          system_instruction:{
-            parts:[
-              {
-                text:systemText
-              }
-            ]
+          method:'POST',
+
+          headers:{
+
+            'Content-Type':
+              'application/json',
+
+            'x-goog-api-key':
+              key
+
           },
 
-          contents:[
-            {
-              role:'user',
-              parts:[
-                {
-                  text:q
-                }
-              ]
-            }
-          ],
+          body:
+            JSON.stringify({
 
-          generationConfig:{
+              system_instruction:{
 
-            maxOutputTokens:400,
+                parts:[
 
-            responseMimeType:'application/json',
+                  {
 
-            responseSchema:{
+                    text:
+                      systemText
 
-              type:'OBJECT',
-
-              properties:{
-
-                say:{
-                  type:'STRING'
-                },
-
-                cmds:{
-                  type:'ARRAY',
-
-                  items:{
-                    type:'STRING',
-
-                    enum:[
-                      'GO',
-                      'STOP',
-                      'HOME',
-                      'EXPLORE'
-                    ]
                   }
-                }
+
+                ]
+
               },
 
-              required:[
-                'say',
-                'cmds'
-              ]
-            }
-          }
-        })
-      }
-    );
+              contents:[
 
-    const j = await response.json();
+                {
+
+                  role:
+                    'user',
+
+                  parts:[
+
+                    {
+
+                      text:
+                        q
+
+                    }
+
+                  ]
+
+                }
+
+              ],
+
+              generationConfig:{
+
+                maxOutputTokens:
+                  400,
+
+                responseMimeType:
+                  'application/json',
+
+                responseSchema:{
+
+                  type:
+                    'OBJECT',
+
+                  properties:{
+
+                    say:{
+
+                      type:
+                        'STRING'
+
+                    },
+
+                    cmds:{
+
+                      type:
+                        'ARRAY',
+
+                      items:{
+
+                        type:
+                          'STRING',
+
+                        enum:[
+
+                          'GO',
+
+                          'STOP',
+
+                          'HOME',
+
+                          'EXPLORE'
+
+                        ]
+
+                      }
+
+                    }
+
+                  },
+
+                  required:[
+
+                    'say',
+
+                    'cmds'
+
+                  ]
+
+                }
+
+              }
+
+            })
+
+        }
+
+      );
+
+
+    const j =
+      await response.json();
+
 
     if(!response.ok){
 
       const message =
+
         j?.error?.message ||
+
         `HTTP ${response.status}`;
 
-      throw new Error(message);
+
+      throw new Error(
+        message
+      );
+
     }
 
+
     const text =
+
       j?.candidates?.[0]?.content?.parts
-        ?.map(p => p.text || '')
+
+        ?.map(
+          p => p.text || ''
+        )
+
         .join('')
+
         .trim();
+
 
     if(!text){
 
       throw new Error(
         'Gemini החזיר תשובה ללא טקסט'
       );
+
     }
+
 
     let o;
 
+
     try{
 
-      o = JSON.parse(text);
+      o =
+        JSON.parse(text);
 
     }catch(e){
 
       throw new Error(
         'Gemini החזיר JSON לא תקין'
       );
+
     }
 
+
     if(
-      typeof o.say !== 'string' ||
-      !Array.isArray(o.cmds)
+
+      typeof o.say !==
+        'string' ||
+
+      !Array.isArray(
+        o.cmds
+      )
+
     ){
 
       throw new Error(
         'מבנה התשובה של Gemini אינו תקין'
       );
+
     }
+
 
     add(
       'a',
       o.say
     );
 
-    for(const c of o.cmds){
+
+    for(
+      const c of o.cmds
+    ){
 
       if(
-        ['GO','STOP','HOME','EXPLORE']
-          .includes(c)
+
+        [
+
+          'GO',
+
+          'STOP',
+
+          'HOME',
+
+          'EXPLORE'
+
+        ].includes(c)
+
       ){
 
-        send(c);
+        await send(c);
+
 
         add(
+
           's',
+
           'נשלח: ' + c
+
         );
+
       }
+
     }
+
 
   }catch(e){
 
     add(
+
       's',
-      'שגיאת Gemini: ' + e.message
+
+      'שגיאת Gemini: ' +
+
+      (e.message || String(e))
+
     );
+
   }
+
 }
 
 </script>
